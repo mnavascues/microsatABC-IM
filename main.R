@@ -8,77 +8,44 @@
 
 nsim          <- 100000                   # number of simulations
 reftable_file <- "reference_table.txt"    # reference table file name
-tolerance     <- 0.1 #0.01                # tolerance level (proportion of kept simulations)
+tolerance     <- 0.01                     # tolerance level (proportion of kept simulations)
 
 # Model description
 #
-#   WEST        EAST
+#    pop1              pop2
 #
-#   theta1      theta2
-#  \      / M  |     |
-#   \    / <-> |     |
-#    \  /      |     |
-#  TS ---------|     |
-#              |     |
-#              |     |
-#              |     |
-#              |     |
-#              thetaA
+#   theta1            theta2
+#  \      /    M       /  \
+#   \    /    <--     /    \
+#    \  /     -->    /      \
+#     \/            /        \
+#  TS ------------------------
+#          |     |
+#          |     |
+#          |     |
+#          |     |
+#          thetaA
 #
-
-# write header of reference table 
-
-paramaters_head <- c("model",      # 0:isolation; 1:isolation with migration
-                     "theta1",     # theta1        (WESTPOP)
-                     "x2",         # theta2/theta1 (EASTPOP)
-                     "xA",         # thetaA/theta1 (ancestral)
-                     "alpha",      # growth rate   (WESTPOP)
-                     "mig12",      # migration
-                     "mig21",      # migration
-                     "TS")         # time split
-statistics_head <- c("m_H_WEST",    # mean (among loci) heterozygosity
-                     "v_H_WEST",    # variance (among loci) of heterozygosity
-                     "m_H_EAST",
-                     "v_H_EAST",
-                     "m_H_total",
-                     "v_H_total",
-                     "m_A_WEST",   # mean (among loci) number of alleles
-                     "v_A_WEST",   # variance (among loci) of number of alleles
-                     "m_A_EAST",
-                     "v_A_EAST",
-                     "m_A_total",
-                     "v_A_total")
-
-write.table( t(c(paramaters_head,statistics_head)),
-             file      = reftable_file,
-             sep       = " ",
-             quote     = F,
-             col.names = F,
-             row.names = F,
-             append    = F)
 
 
 #########################################
 # DEFINE PRIORS (upper and lower limit)
 #########################################
 
-theta1_min <- 0#-3
-theta1_max <- 1# 3
-
-x_min <- 0.5#0.01
-x_max <- 2#100  
+theta_min <- -3
+theta_max <-  3
 
 alpha_min  <- 0
-alpha_max  <- 1#10
+alpha_max  <- 10
 
 M_min <- 0
-M_max <- 1#100
+M_max <- 100
 
 T_min <- 0
-T_max <- 10#100
+T_max <- 10
 
 PGSM_min <- 0     # Generalised Stepwise Mutation model parameter 
-PGSM_max <- 0.5   # (probability of mutations larger than a single repeat unit)
+PGSM_max <- 1     # (probability of mutations larger than a single repeat unit)
 
 #########################################
 # LOAD REQUIRED FUNCTIONS/PACKAGES
@@ -91,11 +58,15 @@ library(abc)    # for approximate Bayesian computation functions
 require(hexbin) # for plots of PCA
 require(grid)   # for plots of PCA
 require(laeken) # necessary? check if it is used...
+require(abcrf)  # abc random forest
 
 # Uses RR Hudson coalescent simulator (ms)
 # load RR Hudson's R script distributed with ms to read ms output in R
 # http://home.uchicago.edu/~rhudson1/source/mksamples.html
 source("readms.output.R")
+
+# load other functions
+source("fun.R")
 
 #########################################
 # LOAD DATA
@@ -122,13 +93,13 @@ for (locus in seq_along(locus_names)){
 }
 
 # creates vector with the position of individuals belonging to the three populations
-Pop_WEST  <- which(microsat_data$POP==1)
-Pop_EAST  <- which(microsat_data$POP==2)
+pop1  <- which(microsat_data$POP==1)
+pop2  <- which(microsat_data$POP==2)
 
 # calculates sample sizes for each population (and total)
-sample_size_WEST  <- length(Pop_WEST)
-sample_size_EAST  <- length(Pop_EAST)
-sample_size_total <- sample_size_WEST + sample_size_EAST
+sample_size_pop1  <- length(pop1)
+sample_size_pop2  <- length(pop2)
+sample_size_total <- sample_size_pop1 + sample_size_pop2
 num_of_loci <- ncol(microsat_data)-2
 
 #########################################
@@ -136,26 +107,8 @@ num_of_loci <- ncol(microsat_data)-2
 #########################################
 
 # Calculate summary statistics for observed data
-# Heterozygosity
-H_WEST    <- apply(microsat_data[Pop_WEST ,-c(1,2)], 2, function(x) H(as.factor(x)) ) 
-m_H_WEST  <- mean(H_WEST,na.rm=T)
-v_H_WEST  <- var(H_WEST,na.rm=T)
-H_EAST    <- apply(microsat_data[Pop_EAST,-c(1,2)], 2, function(x) H(as.factor(x)) ) 
-m_H_EAST  <- mean(H_EAST,na.rm=T)
-v_H_EAST  <- var(H_EAST,na.rm=T)
-H_total   <- apply(microsat_data[          ,-c(1,2)], 2, function(x) H(as.factor(x)) ) 
-m_H_total <- mean(H_total,na.rm=T)
-v_H_total <- var(H_total,na.rm=T)
-# Number of alleles
-A_WEST    <- apply(microsat_data[Pop_WEST ,-c(1,2)], 2, function(x) length(levels(as.factor(x))) ) 
-m_A_WEST  <- mean(A_WEST,na.rm=T)
-v_A_WEST  <- var(A_WEST,na.rm=T)
-A_EAST    <- apply(microsat_data[Pop_EAST,-c(1,2)], 2, function(x) length(levels(as.factor(x))) ) 
-m_A_EAST  <- mean(A_EAST,na.rm=T)
-v_A_EAST  <- var(A_EAST,na.rm=T)
-A_total   <- apply(microsat_data[          ,-c(1,2)], 2, function(x) length(levels(as.factor(x))) ) 
-m_A_total <- mean(A_total,na.rm=T)
-v_A_total <- var(A_total,na.rm=T)
+target_sumstats <- calculate_summary_statistics(data=microsat_data[,-c(1,2)],pop1,pop2)
+statistics_head <- colnames(target_sumstats)
 
 # write header of file
 write.table( t(statistics_head),
@@ -163,8 +116,7 @@ write.table( t(statistics_head),
              quote=F,col.names=F,row.names=F,append=F)
 
 # write summary statistics to file
-write.table( cbind(  m_H_WEST, v_H_WEST, m_H_EAST, v_H_EAST, m_H_total, v_H_total,
-                     m_A_WEST, v_A_WEST, m_A_EAST, v_A_EAST, m_A_total, v_A_total),
+write.table( target_sumstats,
              file      = "target_sumstats.txt",
              sep       = " ",
              quote     = FALSE,
@@ -175,6 +127,25 @@ write.table( cbind(  m_H_WEST, v_H_WEST, m_H_EAST, v_H_EAST, m_H_total, v_H_tota
 #########################################
 # SIMULATION
 #########################################
+
+# write header of reference table 
+paramaters_head <- c("model",      # 0:isolation; 1:isolation with migration
+                     "theta1",     # theta1        (pop1)
+                     "theta2",     # theta1 * x2   (pop2)
+                     "thetaA",     # theta1 * xA   (ancestral)
+                     "alpha1",     # growth rate   (pop1)
+                     "alpha2",     # growth rate   (pop1)
+                     "mig12",      # migration
+                     "mig21",      # migration
+                     "TS",         # time split
+                     "PGSM")       # parameter for the generalised stepwise mutation model   
+write.table( t(c(paramaters_head,statistics_head)),
+             file      = reftable_file,
+             sep       = " ",
+             quote     = F,
+             col.names = F,
+             row.names = F,
+             append    = F)
 
 for(sim in 1:nsim){
   # write progress of simulation on screen 
@@ -189,13 +160,16 @@ for(sim in 1:nsim){
   model <- sample(c(0,1),1)
   
   # take parameter values from priors
-  theta1 <- 10^runif( 1, min=theta1_min, max=theta1_max )
-  x2     <- runif( 1, min=x_min, max=x_max )
-  xA     <- runif( 1, min=x_min, max=x_max )
-  alpha  <- runif( 1, min=alpha_min, max=alpha_max)
+  theta1 <- 10^runif( 1, min=theta_min, max=theta_max )
+  theta2 <- 10^runif( 1, min=theta_min, max=theta_max )
+  thetaA <- 10^runif( 1, min=theta_min, max=theta_max )
+  x2     <- theta2/theta1
+  xA     <- thetaA/theta1
+  alpha1 <- runif( 1, min=alpha_min, max=alpha_max)
+  alpha2 <- runif( 1, min=alpha_min, max=alpha_max)
   if (model==1){
     mig12   <- runif( 1, min=M_min, max=M_max )
-    mig21   <- mig12 # runif( 1, min=0, max=100 )
+    mig21   <- runif( 1, min=M_min, max=M_max )
   }else{
     mig21<-mig12<-0
   }
@@ -208,14 +182,15 @@ for(sim in 1:nsim){
   # generate text with ms command
   ms_out_file <- "msout.txt"
   ms_run <- paste( "ms", sample_size_total, num_of_loci,      # total sample size & number of loci
-                   "-t", theta1,                              # population size in pop WEST
-                   "-I 2", sample_size_WEST, sample_size_EAST,# sample sizes per population
-                   "-n 2", x2,                                # population size in pop EAST
-                   "-m 1 2", mig12,                 # migration rate between WEST and EAST
+                   "-t", theta1,                              # population size in pop1
+                   "-I 2", sample_size_pop1, sample_size_pop2,# sample sizes per population
+                   "-n 2", x2,                                # population size in pop2
+                   "-m 1 2", mig12,                 # migration rate from pop1 to pop2
                    "-m 2 1", mig21,
-                   "-g 1", alpha,                   # growth rate in pop WEST
-                   "-ej", TS, "1 2",                # creation of pop WEST from pop EAST
-                   "-en", TS, "2", xA,              # population size in pop late ancestral
+                   "-g 1", alpha1,                   # growth rate in pop1
+                   "-g 2", alpha2,                   # growth rate in pop1
+                   "-ej", TS, "1 2",                # creation of pop1 from pop2
+                   "-en", TS, "2", xA,              # population size in ancestral
                    ">", ms_out_file)                # output file
   
   # rum ms on system
@@ -247,61 +222,26 @@ for(sim in 1:nsim){
   
   # CALCULATE SUMMARY STATISTICS FOR SIMULATED DATA
   #-------------------------------------------------
-  
-  # Heterozygosity
-  H_WEST    <- apply(simulated_data[Pop_WEST ,], 2, function(x) H(as.factor(x)) ) 
-  m_H_WEST  <- mean(H_WEST,na.rm=T)
-  v_H_WEST  <- var(H_WEST,na.rm=T)
-  H_EAST    <- apply(simulated_data[Pop_EAST,], 2, function(x) H(as.factor(x)) ) 
-  m_H_EAST  <- mean(H_EAST,na.rm=T)
-  v_H_EAST  <- var(H_EAST,na.rm=T)
-  H_total   <- apply(simulated_data[          ,], 2, function(x) H(as.factor(x)) ) 
-  m_H_total <- mean(H_total,na.rm=T)
-  v_H_total <- var(H_total,na.rm=T)
-  # Number of alleles
-  A_WEST    <- apply(simulated_data[Pop_WEST ,], 2, function(x) length(levels(as.factor(x))) ) 
-  m_A_WEST  <- mean(A_WEST,na.rm=T)
-  v_A_WEST  <- var(A_WEST,na.rm=T)
-  A_EAST    <- apply(simulated_data[Pop_EAST,], 2, function(x) length(levels(as.factor(x))) ) 
-  m_A_EAST  <- mean(A_EAST,na.rm=T)
-  v_A_EAST  <- var(A_EAST,na.rm=T)
-  A_total   <- apply(simulated_data[          ,], 2, function(x) length(levels(as.factor(x))) ) 
-  m_A_total <- mean(A_total,na.rm=T)
-  v_A_total <- var(A_total,na.rm=T)
-  
-  
+
+  sim_sumstats <- calculate_summary_statistics(data=simulated_data,pop1,pop2)
+
   # WRITE PARAMATERS AND SUMMARY STATISTICS TO REFERENCE TABLE
   #------------------------------------------------------------
   write.table( cbind( ## PARAMETERS
-    model,      # 0:isolation; 1:isolation with migration
-    theta1,     # theta1        (early)
-    x2,         # theta2/theta1 (late 1)
-    x3,         # theta3/theta1 (late 2)
-    xA,         # thetaA/theta1 (ancestral)
-    alpha,      # growth rate (early)
-    mig12,      # migration
-    mig21,      # migration
-    TE,         # time split of early from late 1
-    TD,         # time split between late 1 and 2
-    #### SUMMARY STATISTICS                      
-    m_H_early,    # mean (among loci) heterozygosity
-    v_H_early,    # variance (among loci) of heterozygosity
-    m_H_late_1,
-    v_H_late_1,
-    m_H_late_2,
-    v_H_late_2,
-    m_H_total,
-    v_H_total,
-    m_A_early,   # mean (among loci) number of alleles
-    v_A_early,   # variance (among loci) of number of alleles
-    m_A_late_1,
-    v_A_late_1,
-    m_A_late_2,
-    v_A_late_2,
-    m_A_total,
-    v_A_total),
-    file=reftable_file,sep=" ",
-    quote=F,col.names=F,row.names=F,append=T)
+                      model,      # 0:isolation; 1:isolation with migration
+                      theta1,     # theta1 (pop1)
+                      theta2,     # theta2 (pop2)
+                      thetaA,     # thetaA (ancestral)
+                      alpha1,      # growth rate (pop1)
+                      alpha2,      # growth rate (pop2)
+                      mig12,      # migration
+                      mig21,      # migration
+                      TS,         # time split of pop1 from pop2
+                      PGSM,
+                      #### SUMMARY STATISTICS                      
+                      sim_sumstats),
+               file=reftable_file,sep=" ",
+               quote=F,col.names=F,row.names=F,append=T)
   
 } # end for(sim in 1:nsim)
 
@@ -324,14 +264,40 @@ ref_table[which(ref_table[,1]==1),1] <- "IM"   # Isolation with Migration (diver
 
 # define set of summary statistics to be used (currently: all are used)
 sumstats_names <- scan(file="target_sumstats.txt",what=character(),nlines=1)
+(sumstats_names==statistics_head)
+sumstats_names <- sumstats_names[-(31:36)]
 
-# estimate posterior probabilities of both models
+# estimate posterior probabilities of both models (rejection and logistic regression methods)
 model_selection_result <- postpr(target  = target_sumstats[sumstats_names],
                                  index   = ref_table[,1],
                                  sumstat = ref_table[,sumstats_names],
                                  tol     = tolerance,
                                  method  = "mnlogistic")
 summary(model_selection_result)
+
+#  estimate posterior probabilities of both models (random forest)
+for( no_sims in c(10000,20000,30000,40000,50000,60000) ){
+  model_RF <- abcrf(modindex = as.factor(ref_table$model)[seq_len(no_sims)],
+                          sumsta   = ref_table[seq_len(no_sims),sumstats_names])
+  assign(paste("model_RF",no_sims,sep="_"),model_RF )
+  remove(model_RF)
+}
+model_RF_10000$prior.err
+model_RF_20000$prior.err
+model_RF_30000$prior.err
+model_RF_40000$prior.err
+model_RF_50000$prior.err
+model_RF_60000$prior.err
+
+err.abcrf(model_RF_40000)
+
+model_selection_result_RF <- predict(object   = model_RF_40000,
+                                     obs      = target_sumstats[sumstats_names],
+                                     sampsize = 40000,
+                                     ntree    = 500,
+                                     paral    = TRUE)
+(model_selection_result_RF)
+summary(model_selection_result_RF)
 
 # separate referece table into two reference tables (for the two models)
 ref_tableIM <- ref_table[which(ref_table[,1]=="IM"),]
@@ -343,11 +309,14 @@ remove(ref_table)
 
 # estimate posterior probability distribution of parameter values
 abcresultIM <- abc(target  = target_sumstats[sumstats_names],
-                   param   = ref_tableIM[,c(2:7,9:10)],
+                   param   = ref_tableIM[,c(2:6,8:9)],
                    sumstat = ref_tableIM[,sumstats_names],
                    tol     = tolerance,
                    method  = "loclinear",
-                   transf  = "log")
+                   transf  = c("log","log","log",
+                               "none","none","none",
+                               "logit"),
+                   logit.bounds=matrix(c(PGSM_min,PGSM_max),nrow=7,ncol=2,byrow=T))
 summary(abcresultIM)
 
 # calculate principal components for summary statistics from simulations
@@ -372,11 +341,14 @@ dev.off ( which=dev.cur() )
 
 # estimate posterior probability distribution of parameter values
 abcresultI <- abc(target  = target_sumstats[sumstats_names],
-                  param   = ref_tableI[,c(2:6,9:10)],
+                  param   = ref_tableI[,c(2:5,8:9)],
                   sumstat = ref_tableI[,sumstats_names],
                   tol     = tolerance,
                   method  = "loclinear",
-                  transf  = "log")
+                  transf  = c("log","log","log",
+                              "none","log",
+                              "logit"),
+                  logit.bounds=matrix(c(PGSM_min,PGSM_max),nrow=6,ncol=2,byrow=T))
 summary(abcresultI)
 
 
@@ -386,7 +358,7 @@ PCA_stats  <- princomp(ref_tableI[no_NA,sumstats_names])
 PCA_target <- predict(PCA_stats, target_sumstats[sumstats_names])
 # represent graphically PCA to verify that simulations are producing 
 # simulations similar to real data
-pdf(file="Sylvia_PCA_I.pdf", width=11.7, height=8.3)
+pdf(file="PCA_I.pdf", width=11.7, height=8.3)
 for (pci in 1:7){
   for (pcj in (pci+1):8){
     hbin<-hexbin(PCA_stats$scores[,pci], PCA_stats$scores[,pcj],xbins=100,xlab=paste("PC",pci),ylab=paste("PC",pcj))
@@ -396,4 +368,5 @@ for (pci in 1:7){
   }
 }
 dev.off ( which=dev.cur() )
+
 
