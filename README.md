@@ -1,7 +1,7 @@
 # microsatABC-IM
-Script in R to performa an Approximate Bayesian Computation (ABC) analysis under the Isolation with Migration model from microsatellite data. It uses random forest for model choice and parameter estimation as described by Pudlo et al. (2016) and Marin et al. (2016).
+Script in R to perform an Approximate Bayesian Computation (ABC) analysis under the Isolation with Migration model from microsatellite data. It uses random forest for model choice and parameter estimation as described by Pudlo et al. (2016) and Marin et al. (2016).
 
-REFERENCES
+## REFERENCES
 
 Marin, J.-M., L. Raynal, P. Pudlo, M. Ribatet, and C. P. Robert. 2016. ABC random forests for Bayesian parameter inference. arXiv:1605.05537.
 
