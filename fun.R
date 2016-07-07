@@ -123,7 +123,7 @@ calculate_summary_statistics <- function(data,pop1,pop2){
   Beta_total   <- Kimmel_beta(H_total,V_total,log_beta=T)
   m_Beta_total <- mean(Beta_total,na.rm=T)
   v_Beta_total <- var(Beta_total,na.rm=T)
-  # beta prime
+  # Navascués beta
   BetaP_pop1   <- beta_prime(A_pop1,V_pop1,log_beta=T)
   m_BetaP_pop1 <- mean(BetaP_pop1,na.rm=T)
   v_BetaP_pop1 <- var(BetaP_pop1,na.rm=T)
