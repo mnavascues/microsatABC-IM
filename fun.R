@@ -247,7 +247,7 @@ do_sim <- function(sim,nsim,
   #alpha1 <- runif( 1, min=alpha_min, max=alpha_max)
   #alpha2 <- runif( 1, min=alpha_min, max=alpha_max)
   if (model==1){
-    M <- runif( 1, min=M_min, max=M_max )
+    M <- 10^runif( 1, min=M_min, max=M_max )
     #mig12   <- runif( 1, min=M_min, max=M_max )
     #mig21   <- runif( 1, min=M_min, max=M_max )
   }else{
