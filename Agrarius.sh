@@ -1,5 +1,5 @@
 #!/bin/bash
-# définir le type de shell ?????
+# type of shell
 #$ -S /bin/bash
 
 # Set name of job:
