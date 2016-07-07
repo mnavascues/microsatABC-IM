@@ -24,7 +24,7 @@ simulations_only <- F
 parallel_sims    <- T
 num_of_threads   <- 8
 
-# Model description
+# Model graphical description
 #
 #     pop1            pop2
 #
@@ -40,7 +40,9 @@ num_of_threads   <- 8
 #                   |     |
 #                   thetaA
 #
-
+# NB: a population expansion is assumed in pop 1,
+# but no assumption on thhe type of demographic change
+# is made for pop 2 (see file fun.R to check ms command)
 
 #########################################
 # DEFINE PRIORS (upper and lower limit)
@@ -48,9 +50,6 @@ num_of_threads   <- 8
 
 theta_min <- -1
 theta_max <-  3
-
-#alpha_min  <- -3
-#alpha_max  <-  3
 
 M_min <- -3
 M_max <- 2
@@ -85,7 +84,7 @@ if(parallel_sims){
 # http://home.uchicago.edu/~rhudson1/source/mksamples.html
 source("readms.output.R")
 
-# load other functions
+# load other functions (from file distributed together with present file)
 source("fun.R")
 
 #########################################
