@@ -222,7 +222,7 @@ cat("\n Simulations finished\n\n")
 
 
 #########################################
-# ABC: REJECTION + REGRESSION
+# ABC
 #########################################
 if(!simulations_only){
   # read reference table
@@ -460,7 +460,94 @@ if(!simulations_only){
     abline(v=target_sumstats[,ss_name],col="red")
   }
   dev.off ( which=dev.cur() )
+
   
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  pdf(file="priorposteriorqqplots.pdf")
+  par(mfrow=c(3,3))
+  for (param in 2:length(paramaters_head)){
+    paramater_values <- ref_tableIM[seq_len(num_of_sim),param]
+    if (param==2 | param==3 | param == 4 | param == 5){
+      paramater_values <-log10(paramater_values)
+      distribution_limits <- c(-1,3)
+      if (param==2) plot_main_title <- expression(theta[W])
+      if (param==3) plot_main_title <- expression(theta[F])
+      if (param==4) plot_main_title <- expression(theta[E])
+      if (param==5) plot_main_title <- expression(theta[A])
+    }
+    if (param==6 | param==7 | param == 9 ){
+      distribution_limits <- c(0,10)
+      if (param==6) plot_main_title <- expression(T[W])
+      if (param==7) plot_main_title <- expression(T[E])
+      if (param==9) plot_main_title <- expression(T[F])
+    }     
+    if (param==8 ){
+      distribution_limits <- c(0.001,100)
+      plot_main_title <- "M"
+    }     
+    if (param==10 ){
+      distribution_limits <- c(0,1)
+      plot_main_title <- expression(P[GSM])
+    } 
+    
+    load(paste0(paramaters_head[param],"_parameter_estimate.RData"))
+    
+    RFmodel <- get(paste0("RFreg_",paramaters_head[param]))
+    
+    
+    
+    
+    
+    
+    
+    
+    posterior <- predict(object  = RFmodel,
+                         newdata = target_sumstats[,sumstats_names],
+                         what    = quant )
+    prior      <- quantile(paramater_values, probs=quant)
+
+    plot(prior,
+         posterior,
+         xlab=expression("prior quantiles"),
+         ylab=expression("posterior quantiles"),
+         type="l",
+         ylim=distribution_limits,
+         xlim=distribution_limits,
+         main=plot_main_title)
+    #abline(h=posterior[which(quant==0.5)],col="red",lwd=2)
+    #abline(h=posterior[which(quant==0.025)],col="red",lwd=2,lty=2)
+    #abline(h=posterior[which(quant==0.975)],col="red",lwd=2,lty=2)
+
+    lines(distribution_limits,distribution_limits,lty=2)
+    
+    
+  }
+  dev.off()
+  
+  
+  
+  
+  
+    
 }  
 
 

@@ -25,7 +25,7 @@ bottleneck <- function(Na,He,n){
   bottleneck <- He - expHe
   return(bottleneck)
 }
-beta_prime <- function(Na,V,log_beta=F){
+Navascues_beta <- function(Na,V,log_beta=F){
   stopifnot(length(V)==length(Na))
   theta_V  <- V
   theta_Na <- (Na^2-1)/2
@@ -124,13 +124,13 @@ calculate_summary_statistics <- function(data,pop1,pop2){
   m_Beta_total <- mean(Beta_total,na.rm=T)
   v_Beta_total <- var(Beta_total,na.rm=T)
   # Navascués beta
-  BetaP_pop1   <- beta_prime(A_pop1,V_pop1,log_beta=T)
+  BetaP_pop1   <- Navascues_beta(A_pop1,V_pop1,log_beta=T)
   m_BetaP_pop1 <- mean(BetaP_pop1,na.rm=T)
   v_BetaP_pop1 <- var(BetaP_pop1,na.rm=T)
-  BetaP_pop2   <- beta_prime(A_pop2,V_pop2,log_beta=T)
+  BetaP_pop2   <- Navascues_beta(A_pop2,V_pop2,log_beta=T)
   m_BetaP_pop2 <- mean(BetaP_pop2,na.rm=T)
   v_BetaP_pop2 <- var(BetaP_pop2,na.rm=T)
-  BetaP_total   <- beta_prime(A_total,V_total,log_beta=T)
+  BetaP_total   <- Navascues_beta(A_total,V_total,log_beta=T)
   m_BetaP_total <- mean(BetaP_total,na.rm=T)
   v_BetaP_total <- var(BetaP_total,na.rm=T)
   # Bottleneck
