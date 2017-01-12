@@ -266,7 +266,8 @@ if(!simulations_only){
   #  estimate posterior probabilities of both models (random forest)
   for( no_sims in c(5000,10000,15000,20000,25000,30000) ){
     model_RF <- abcrf(modindex = as.factor(ref_table$model)[seq_len(no_sims)],
-                      sumsta   = ref_table[seq_len(no_sims),sumstats_names])
+                      sumsta   = ref_table[seq_len(no_sims),sumstats_names],
+                      paral=T, ncores=16)
     assign(paste("model_RF",no_sims,sep="_"),model_RF )
     remove(model_RF)
   }
