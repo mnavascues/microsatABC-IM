@@ -16,5 +16,9 @@ Marin, J.-M., L. Raynal, P. Pudlo, M. Ribatet, and C. P. Robert. 2016. ABC rando
 Pudlo, P., J.-M. Marin, A. Estoup, J.-M. Cornuet, M. Gautier, and C. P. Robert. 2016. Reliable ABC model choice via random forests. *Bioinformatics* **32**:859–866.
 
 
+### Requirements
 
+Executable of ms and script to read ms output (distributed woth ms) in /bin
+
+R packages: abcrf
 
