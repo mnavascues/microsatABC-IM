@@ -293,9 +293,9 @@ if(!simulations_only){
                                        paral.predict  = T,
                                        ncores.predict = num_of_threads)
   
-# error in predict, run manually to get the following result:
-#   selected model votes model1 votes model2 post.proba
-# 1              2        0.143        0.857  0.8572667
+  # error in predict, run manually to get the following result:
+  #   selected model votes model1 votes model2 post.proba
+  # 1              2        0.143        0.857  0.8572667
   
   
   #(model_selection_result_RF)
@@ -305,241 +305,325 @@ if(!simulations_only){
        #model_selection_result_RF,
        file="model_choice.RData")
   
-  load(file="model_choice.RData")
+  #load(file="model_choice.RData")
   # separate referece table into two reference tables (for the two models)
-  ref_tableIM <- ref_table[which(ref_table[,1]=="IM"),]
-  ref_tableI  <- ref_table[which(ref_table[,1]=="I") ,]
+  ref_tableIM <- ref_table[which(ref_table[,1]==2),]
   remove(ref_table)
-  remove(ref_tableI)
   gc()
   dim(ref_tableIM)
   
   # ISOLATION WITH MIGRATION
   #--------------------------
 
-  num_of_trees <- 1000
-  quant <- seq(0,1,0.001)
-  num_of_sim <- 30000
-
   #logit    <- function(x){log(x/(1-x))}
   #invlogit <- function(x){exp(x)/(1+exp(x))}
 
-  for (param in 2:length(paramaters_head)){
-    paramater_values <- ref_tableIM[seq_len(num_of_sim),param]
-    if (param==2 | param==3 | param == 4 | param == 5){
-      paramater_values <-log10(paramater_values)
-    }
-    #if (param==10){
-    #  paramater_values <-logit( paramater_values )
-    #}
-    
-    RFmodel <- quantregForest(x = ref_tableIM[seq_len(num_of_sim),sumstats_names],
-                              y = paramater_values,
-                              ntree = num_of_trees)
-
-    pdf(file=paste0(paramaters_head[param],".pdf"))
-
-    plot(RFmodel,main=paramaters_head[param])
-    plot(round(num_of_trees/2) : num_of_trees,
-         RFmodel$mse[round(num_of_trees/2) : num_of_trees],
-         type="l",
-         ylab="Error",xlab="trees",
-         main=paramaters_head[param])
-    RFmodel$mse[num_of_trees]
-    
-    plot(paramater_values,RFmodel$predicted,
-         ylab="predicted",xlab="true value",
-         main=paramaters_head[param])
-
-    if (param==2 | param==3 | param == 4 | param == 5){
-      plot(10^(paramater_values),10^(RFmodel$predicted),
-           ylab="predicted",xlab="true value",
-           main=paste0(paramaters_head[param], ", natural scale"))
-    }
-    #if (param==10){
-    #  plot(invlogit(paramater_values),invlogit(RFmodel$predicted),
-    #       ylab="predicted",xlab="true value",
-    #       main=paste0(paramaters_head[param], ", natural scale"))
-    #}
-    
-    posterior <- predict(object  = RFmodel,
-                         newdata = target_sumstats[,sumstats_names],
-                         what    = quant )
-    posterior_mean <- predict(object  = RFmodel,
-                              newdata = target_sumstats[,sumstats_names],
-                              what    = mean )
-    
-    prior      <- quantile(paramater_values, probs=quant)
-    prior_mean <- mean(paramater_values)
-    
-    plot(prior,
-         posterior,
-         xlab=expression("prior quantiles"),
-         ylab=expression("posterior quantiles"),
-         type="l",
-         main=paramaters_head[param])
-    abline(h=posterior[which(quant==0.5)],col="red",lwd=2)
-    abline(h=posterior_mean,col="blue",lwd=2)
-    abline(h=posterior[which(quant==0.025)],col="red",lwd=2,lty=2)
-    abline(h=posterior[which(quant==0.975)],col="red",lwd=2,lty=2)
-    abline(h=posterior[which(quant==0.25)],col="red",lty=2)
-    abline(h=posterior[which(quant==0.75)],col="red",lty=2)
-    
-    varImpPlot(RFmodel,main=paste("Variable Importance to estimate ",paramaters_head[param]))
-    
-    dev.off()
-    
-    
-    
-    
-    model_name <- paste("RFreg",paramaters_head[param],sep="_")
-    assign(  model_name, RFmodel)
-    
-    save(get(model_name),file=paste(model_name,"parameter_estimate.RData",sep="_"))
-  }
+  sumsta   <- ref_tableIM[,sumstats_names]
+  
+  
+  # theta1
+  #------------
+  
+  log10theta1 <- log10(ref_tableIM[,"theta1"])
+  RFmodel_theta1 <- regAbcrf(formula = log10theta1~.,
+                             data    = data.frame(log10theta1, sumsta),
+                             ntree   = 1000,
+                             paral   = T,
+                             ncores  = num_of_threads)
+  plot(x     = RFmodel_theta1,
+       n.var = ncol(sumsta))
+  err.regAbcrf(object   = RFmodel_theta1,
+               training = data.frame(log10theta1, sumsta),
+               paral    = T,
+               ncores   = num_of_threads)
+  posterior_theta1 <- predict(object    = RFmodel_theta1,
+                              obs       = target_sumstats,
+                              training  = data.frame(log10theta1, sumsta),
+                              quantiles = c(0.025,0.5,0.975),
+                              paral     = T,
+                              ncores    = num_of_threads)
+  (posterior_theta1)
+  densityPlot(object    = RFmodel_theta1,
+              obs       = target_sumstats,
+              training  = data.frame(log10theta1, sumsta),
+              main      = expression(log[10]*theta["W"]),
+              paral     = T, 
+              ncores    = num_of_threads,
+              col       = "red")
+  lines(density(log10theta1), col="grey")
+  
 
   
-  paramater_values <- ref_tableIM[seq_len(num_of_sim),3]/ref_tableIM[seq_len(num_of_sim),2]
-  RFreg_X1 <- quantregForest(x = ref_tableIM[seq_len(num_of_sim),sumstats_names],
-                               y = paramater_values,
-                               ntree = num_of_trees)
-  pdf(file="X1.pdf")
-  plot(RFreg_X1,main="X1")
-  plot(round(num_of_trees/2) : num_of_trees,
-       RFreg_X1$mse[round(num_of_trees/2) : num_of_trees],
-       type="l",
-       ylab="Error",xlab="trees",
-       main="X1")
-  RFreg_X1$mse[num_of_trees]
-    
-  plot(paramater_values,RFreg_X1$predicted,
-       ylab="predicted",xlab="true value",
-       main="X1")
-  posterior <- predict(object  = RFreg_X1,
-                       newdata = target_sumstats[,sumstats_names],
-                       what    = quant )
-  posterior_mean <- predict(object  = RFreg_X1,
-                            newdata = target_sumstats[,sumstats_names],
-                            what    = mean )
-    
-  prior      <- quantile(paramater_values, probs=quant)
-  prior_mean <- mean(paramater_values)
-    
-  plot(prior,
-       posterior,
-       xlab=expression("prior quantiles"),
-       ylab=expression("posterior quantiles"),
-       type="l",
-       main="X1")
-  abline(h=posterior[which(quant==0.5)],col="red",lwd=2)
-  abline(h=posterior_mean,col="blue",lwd=2)
-  abline(h=posterior[which(quant==0.025)],col="red",lwd=2,lty=2)
-  abline(h=posterior[which(quant==0.975)],col="red",lwd=2,lty=2)
-  abline(h=posterior[which(quant==0.25)],col="red",lty=2)
-  abline(h=posterior[which(quant==0.75)],col="red",lty=2)
-    
-  varImpPlot(RFreg_X1,main=paste("Variable Importance to estimate ","X1"))
-    
-  dev.off()
-
-  save(RFreg_X1,file="X1_parameter_estimate.RData")
   
-  #load(file="parameter_estimate.RData")
-
-  pdf(file="SS_obs_vs_sim_IM.pdf", width=11.7, height=8.3)
-  for(ss in seq_along(sumstats_names)){
-    ss_name <- sumstats_names[ss] 
-    #hist(ref_tableIM[,ss_name])
-    #abline(v=target_sumstats[,ss_name],col="red")
-    plot(density (ref_tableIM[,ss_name]),main=ss_name)
-    abline(v=target_sumstats[,ss_name],col="red")
-  }
-  dev.off ( which=dev.cur() )
+  
+    
+  
+  
+  # theta2
+  #------------
+  
+  log10theta2 <- log10(ref_tableIM[,"theta2"])
+  RFmodel_theta2 <- regAbcrf(formula = log10theta2~.,
+                             data    = data.frame(log10theta2, sumsta),
+                             ntree   = 1000,
+                             paral   = T,
+                             ncores  = num_of_threads)
+  plot(x     = RFmodel_theta2,
+       n.var = ncol(sumsta))
+  err.regAbcrf(object   = RFmodel_theta2,
+               training = data.frame(log10theta2, sumsta),
+               paral    = T,
+               ncores   = num_of_threads)
+  posterior_theta2 <- predict(object    = RFmodel_theta2,
+                              obs       = target_sumstats,
+                              training  = data.frame(log10theta2, sumsta),
+                              quantiles = c(0.025,0.5,0.975),
+                              paral     = T,
+                              ncores    = num_of_threads)
+  (posterior_theta2)
+  densityPlot(object    = RFmodel_theta2,
+              obs       = target_sumstats,
+              training  = data.frame(log10theta2, sumsta),
+              main      = expression(log[10]*theta["E"]),
+              paral     = T, 
+              ncores    = num_of_threads)
+  lines(density(log10theta2), col="grey")
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  # thetaA
+  #------------
+  
+  log10thetaA <- log10(ref_tableIM[,"thetaA"])
+  RFmodel_thetaA <- regAbcrf(formula = log10thetaA~.,
+                             data    = data.frame(log10thetaA, sumsta),
+                             ntree   = 1000,
+                             paral   = T,
+                             ncores  = num_of_threads)
+  plot(x     = RFmodel_thetaA,
+       n.var = ncol(sumsta))
+  err.regAbcrf(object   = RFmodel_thetaA,
+               training = data.frame(log10theta2, sumsta),
+               paral    = T,
+               ncores   = num_of_threads)
+  posterior_thetaA <- predict(object    = RFmodel_thetaA,
+                              obs       = target_sumstats,
+                              training  = data.frame(log10theta2, sumsta),
+                              quantiles = c(0.025,0.5,0.975),
+                              paral     = T,
+                              ncores    = num_of_threads)
+  (posterior_thetaA)
+  densityPlot(object    = RFmodel_thetaA,
+              obs       = target_sumstats,
+              training  = data.frame(log10theta2, sumsta),
+              main      = expression(log[10]*theta["A"]),
+              paral     = T, 
+              ncores    = num_of_threads)
+  lines(density(log10theta2), col="grey")
+  
+  
+  
 
   
   
   
   
+  # alpha1
+  #------------
   
+  alpha1 <- ref_tableIM[,"alpha1"]
+  RFmodel_alpha1 <- regAbcrf(formula = alpha1~.,
+                             data    = data.frame(alpha1, sumsta),
+                             ntree   = 1000,
+                             paral   = T,
+                             ncores  = num_of_threads)
+  plot(x     = RFmodel_alpha1,
+       n.var = ncol(sumsta))
+  err.regAbcrf(object   = RFmodel_alpha1,
+               training = data.frame(alpha1, sumsta),
+               paral    = T,
+               ncores   = num_of_threads)
+  posterior_alpha1 <- predict(object    = RFmodel_alpha1,
+                              obs       = target_sumstats,
+                              training  = data.frame(alpha1, sumsta),
+                              quantiles = c(0.025,0.5,0.975),
+                              paral     = T,
+                              ncores    = num_of_threads)
+  (posterior_alpha1)
+  densityPlot(object    = RFmodel_alpha1,
+              obs       = target_sumstats,
+              training  = data.frame(alpha1, sumsta),
+              main      = expression(alpha),
+              paral     = T, 
+              ncores    = num_of_threads)
+  lines(density(alpha1), col="grey")
   
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  pdf(file="priorposteriorqqplots.pdf")
-  par(mfrow=c(3,3))
-  for (param in 2:length(paramaters_head)){
-    paramater_values <- ref_tableIM[seq_len(num_of_sim),param]
-    if (param==2 | param==3 | param == 4 | param == 5){
-      paramater_values <-log10(paramater_values)
-      distribution_limits <- c(-1,3)
-      if (param==2) plot_main_title <- expression(theta[W])
-      if (param==3) plot_main_title <- expression(theta[F])
-      if (param==4) plot_main_title <- expression(theta[E])
-      if (param==5) plot_main_title <- expression(theta[A])
-    }
-    if (param==6 | param==7 | param == 9 ){
-      distribution_limits <- c(0,10)
-      if (param==6) plot_main_title <- expression(T[W])
-      if (param==7) plot_main_title <- expression(T[E])
-      if (param==9) plot_main_title <- expression(T[F])
-    }     
-    if (param==8 ){
-      distribution_limits <- c(0.001,100)
-      plot_main_title <- "M"
-    }     
-    if (param==10 ){
-      distribution_limits <- c(0,1)
-      plot_main_title <- expression(P[GSM])
-    } 
-    
-    load(paste0(paramaters_head[param],"_parameter_estimate.RData"))
-    
-    RFmodel <- get(paste0("RFreg_",paramaters_head[param]))
-    
-    
-    
-    
-    
-    
-    
-    
-    posterior <- predict(object  = RFmodel,
-                         newdata = target_sumstats[,sumstats_names],
-                         what    = quant )
-    prior      <- quantile(paramater_values, probs=quant)
 
-    plot(prior,
-         posterior,
-         xlab=expression("prior quantiles"),
-         ylab=expression("posterior quantiles"),
-         type="l",
-         ylim=distribution_limits,
-         xlim=distribution_limits,
-         main=plot_main_title)
-    #abline(h=posterior[which(quant==0.5)],col="red",lwd=2)
-    #abline(h=posterior[which(quant==0.025)],col="red",lwd=2,lty=2)
-    #abline(h=posterior[which(quant==0.975)],col="red",lwd=2,lty=2)
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  # T2
+  #------------
+  
+  T2 <- ref_tableIM[,"T2"]
+  RFmodel_T2 <- regAbcrf(formula = T2~.,
+                         data    = data.frame(T2, sumsta),
+                         ntree   = 1000,
+                         paral   = T,
+                         ncores  = num_of_threads)
+  plot(x     = RFmodel_T2,
+       n.var = ncol(sumsta))
+  err.regAbcrf(object   = RFmodel_T2,
+               training = data.frame(T2, sumsta),
+               paral    = T,
+               ncores   = num_of_threads)
+  posterior_T2 <- predict(object    = RFmodel_T2,
+                          obs       = target_sumstats,
+                          training  = data.frame(T2, sumsta),
+                          quantiles = c(0.025,0.5,0.975),
+                          paral     = TRUE,
+                          ncores    = num_of_threads)
+  (posterior_T2)
+  densityPlot(object    = RFmodel_T2,
+              obs       = target_sumstats,
+              training  = data.frame(T2, sumsta),
+              main      = expression("T"["E"]),
+              paral     = TRUE, 
+              ncores    = num_of_threads)
+  lines(density(T2), col="grey")
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  # T2
+  #------------
+  
+  TS <- ref_tableIM[,"TS"]
+  RFmodel_TS <- regAbcrf(formula = TS~.,
+                         data    = data.frame(TS, sumsta),
+                         ntree   = 1000,
+                         paral   = T,
+                         ncores  = num_of_threads)
+  plot(x     = RFmodel_TS,
+       n.var = ncol(sumsta))
+  err.regAbcrf(object   = RFmodel_TS,
+               training = data.frame(TS, sumsta),
+               paral    = T,
+               ncores   = num_of_threads)
+  posterior_TS <- predict(object    = RFmodel_TS,
+                          obs       = target_sumstats,
+                          training  = data.frame(TS, sumsta),
+                          quantiles = c(0.025,0.5,0.975),
+                          paral     = TRUE,
+                          ncores    = num_of_threads)
+  (posterior_TS)
+  densityPlot(object    = RFmodel_TS,
+              obs       = target_sumstats,
+              training  = data.frame(TS, sumsta),
+              main      = expression("T"["F"]),
+              paral     = TRUE, 
+              ncores    = num_of_threads)
+  lines(density(TS), col="grey")
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  # M
+  #------------
+  
+  log10M <- log10(ref_tableIM[,"M"])
+  RFmodel_log10M <- regAbcrf(formula = log10M~.,
+                             data    = data.frame(log10M, sumsta),
+                             ntree   = 1000,
+                             paral   = T,
+                             ncores  = num_of_threads)
+  plot(x     = RFmodel_log10M,
+       n.var = ncol(sumsta))
+  err.regAbcrf(object   = RFmodel_log10M,
+               training = data.frame(log10M, sumsta),
+               paral    = T,
+               ncores   = num_of_threads)
+  posterior_log10M <- predict(object    = RFmodel_log10M,
+                              obs       = target_sumstats,
+                              training  = data.frame(log10M, sumsta),
+                              quantiles = c(0.025,0.5,0.975),
+                              paral     = TRUE,
+                              ncores    = num_of_threads)
+  (posterior_log10M)
+  densityPlot(object    = RFmodel_log10M,
+              obs       = target_sumstats,
+              training  = data.frame(log10M, sumsta),
+              main      = expression(log[10]*"M"),
+              paral     = TRUE, 
+              ncores    = num_of_threads)
+  lines(density(log10M), col="grey")
+  
 
-    lines(distribution_limits,distribution_limits,lty=2)
-    
-    
-  }
-  dev.off()
   
   
   
+  
+  # PGSM
+  #------------
+  
+  PGSM <- ref_tableIM[,"PGSM"]
+  RFmodel_PGSM <- regAbcrf(formula = PGSM~.,
+                           data    = data.frame(PGSM, sumsta),
+                           ntree   = 1000,
+                           paral   = T,
+                           ncores  = num_of_threads)
+  plot(x     = RFmodel_PGSM,
+       n.var = ncol(sumsta))
+  err.regAbcrf(object   = RFmodel_PGSM,
+               training = data.frame(PGSM, sumsta),
+               paral    = T,
+               ncores   = num_of_threads)
+  posterior_PGSM <- predict(object    = RFmodel_PGSM,
+                            obs       = target_sumstats,
+                            training  = data.frame(PGSM, sumsta),
+                            quantiles = c(0.025,0.5,0.975),
+                            paral     = TRUE,
+                            ncores    = num_of_threads)
+  (posterior_PGSM)
+  densityPlot(object    = RFmodel_PGSM,
+              obs       = target_sumstats,
+              training  = data.frame(PGSM, sumsta),
+              main      = expression("P"["GSM"]),
+              paral     = TRUE, 
+              ncores    = num_of_threads)
+  lines(density(PGSM), col="grey")
   
   
     
