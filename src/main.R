@@ -13,14 +13,13 @@ ls()
 # ABC GENERAL SETTINGS
 #########################################
 
-nsim             <- 20000               # number of simulations
+nsim             <- 40000               # number of simulations
 input_filename   <- "data/agrarius.str" # data file
 reftable_file    <- "results/reference_table"   # reference table file name
-tolerance        <- 0.01                # tolerance level (proportion of kept simulations)
 seed             <- 1234 ; 
 set.seed(seed,"Mersenne-Twister")
 check_data       <- T
-simulations_only <- F
+simulations_only <- T
 parallel_sims    <- T
 num_of_threads   <- 12
 
@@ -29,16 +28,16 @@ num_of_threads   <- 12
 #     pop1            pop2
 #
 #    theta1          theta2
-#  \         /  M   |   | 
-#   \       / <---> |   | 
-#    \     /        |   |_  T2 (either expansion or contraction) 
-#     \   /         |     |
-#  TS  \_/__________|     |
+#     |   |    M    |     | 
+#     |   |  <--->  |     | 
+#     |   |         |     | 
+#     |   |         |     |
+#  TS |___|_________|     |
 #                   |     |
 #                   |     |
 #                   |     |
 #                   |     |
-#                   thetaA
+# 
 #
 # NB: a population expansion is assumed in pop 1 (with growth rate alpha1),
 # but no assumption on thhe type of demographic change
@@ -52,11 +51,11 @@ num_of_threads   <- 12
 theta_min <- -1
 theta_max <-  3
 
-M_min <- -3
+M_min <- -4
 M_max <- 2
 
-T_min <- 0
-T_max <- 10
+T_min <- -5
+T_max <- 2
 
 alpha_min <- 0
 alpha_max <- 5

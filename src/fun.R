@@ -242,11 +242,11 @@ do_sim <- function(sim,nsim,
   #thetaF <- min(theta_pop1)
   theta1 <- 10^runif( 1, min=theta_min, max=theta_max )
   theta2 <- 10^runif( 1, min=theta_min, max=theta_max )
-  thetaA <- 10^runif( 1, min=theta_min, max=theta_max )
+  #thetaA <- 10^runif( 1, min=theta_min, max=theta_max )
   x2     <- theta2/theta1
-  xA     <- thetaA/theta1
+  #xA     <- thetaA/theta1
   #xF     <- thetaF/theta1
-  alpha1  <- runif( 1, min=alpha_min, max=alpha_max)
+  #alpha1  <- runif( 1, min=alpha_min, max=alpha_max)
   #alpha2 <- runif( 1, min=alpha_min, max=alpha_max)
   if (model==1){
     M <- 10^runif( 1, min=M_min, max=M_max )
@@ -256,9 +256,9 @@ do_sim <- function(sim,nsim,
     M <- 0
     #mig21<-mig12<-0
   }
-  TS <- runif( 1, min=T_min, max=T_max )
+  TS <- 10^runif( 1, min=T_min, max=T_max )
   #T1 <- runif( 1, min=T_min, max=TS )
-  T2 <- runif( 1, min=T_min, max=T_max )
+  #T2 <- runif( 1, min=T_min, max=T_max )
   PGSM <- runif( 1, min=PGSM_min, max=PGSM_max )
   
   # RUM MS
@@ -270,9 +270,9 @@ do_sim <- function(sim,nsim,
                    "-t", theta1,                                  # population size in pop1
                    "-I 2", sample_size_pop1, sample_size_pop2, M, # sample sizes per population & migration
                    "-n 2", x2,                                    # population size in pop2
-                   "-g 1", alpha1,
+                   #"-g 1", alpha1,
                    #"-en", T1, "1", xF,                           # change pop size in pop1
-                   "-en", T2, "2", xA,                            # change pop size in pop2
+                   #"-en", T2, "2", xA,                            # change pop size in pop2
                    "-ej", TS, "1 2",                              # creation of pop1 from pop2
                    ">", ms_out_file)                              # output file
   
