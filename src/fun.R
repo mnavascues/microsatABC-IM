@@ -27,7 +27,7 @@ bottleneck <- function(Na,He,n){
 }
 Navascues_beta <- function(Na,V,log_beta=F){
   stopifnot(length(V)==length(Na))
-  theta_V  <- V
+  theta_V  <- 2*V
   theta_Na <- (Na^2-1)/2
   beta <- theta_V/theta_Na
   if (log_beta){
@@ -221,6 +221,7 @@ do_sim <- function(sim,nsim,
                    theta_min,theta_max,
                    M_min,M_max,
                    T_min,T_max,
+                   alpha_min,alpha_max,
                    PGSM_min,PGSM_max,
                    sample_size_total,sample_size_pop1,sample_size_pop2,
                    num_of_loci, missing_data){
@@ -236,15 +237,16 @@ do_sim <- function(sim,nsim,
   model <- sample(c(0,1),1)
   
   # take parameter values from priors
-  theta_pop1 <- 10^runif( 2, min=theta_min, max=theta_max )
-  theta1 <- max(theta_pop1)
-  thetaF <- min(theta_pop1)
+  #theta_pop1 <- 10^runif( 2, min=theta_min, max=theta_max )
+  #theta1 <- max(theta_pop1)
+  #thetaF <- min(theta_pop1)
+  theta1 <- 10^runif( 1, min=theta_min, max=theta_max )
   theta2 <- 10^runif( 1, min=theta_min, max=theta_max )
   thetaA <- 10^runif( 1, min=theta_min, max=theta_max )
   x2     <- theta2/theta1
   xA     <- thetaA/theta1
-  xF     <- thetaF/theta1
-  #alpha1 <- runif( 1, min=alpha_min, max=alpha_max)
+  #xF     <- thetaF/theta1
+  alpha1  <- runif( 1, min=alpha_min, max=alpha_max)
   #alpha2 <- runif( 1, min=alpha_min, max=alpha_max)
   if (model==1){
     M <- 10^runif( 1, min=M_min, max=M_max )
@@ -255,7 +257,7 @@ do_sim <- function(sim,nsim,
     #mig21<-mig12<-0
   }
   TS <- runif( 1, min=T_min, max=T_max )
-  T1 <- runif( 1, min=T_min, max=TS )
+  #T1 <- runif( 1, min=T_min, max=TS )
   T2 <- runif( 1, min=T_min, max=T_max )
   PGSM <- runif( 1, min=PGSM_min, max=PGSM_max )
   
@@ -264,14 +266,15 @@ do_sim <- function(sim,nsim,
   
   # generate text with ms command
   ms_out_file <- paste0("msout",sim,".txt")
-  ms_run <- paste( "ms", sample_size_total, num_of_loci,          # total sample size & number of loci
+  ms_run <- paste( "bin/ms", sample_size_total, num_of_loci,          # total sample size & number of loci
                    "-t", theta1,                                  # population size in pop1
                    "-I 2", sample_size_pop1, sample_size_pop2, M, # sample sizes per population & migration
                    "-n 2", x2,                                    # population size in pop2
-                   "-en", T1, "1", xF,   # change pop size in pop1
-                   "-en", T2, "2", xA,   # change pop size in pop2
-                   "-ej", TS, "1 2",                # creation of pop1 from pop2
-                   ">", ms_out_file)                # output file
+                   "-g 1", alpha1,
+                   #"-en", T1, "1", xF,                           # change pop size in pop1
+                   "-en", T2, "2", xA,                            # change pop size in pop2
+                   "-ej", TS, "1 2",                              # creation of pop1 from pop2
+                   ">", ms_out_file)                              # output file
   
   # rum ms on system
   if(.Platform$OS.type == "unix") {
@@ -314,10 +317,11 @@ do_sim <- function(sim,nsim,
     return( cbind( ## PARAMETERS
                   model,      # 0:isolation; 1:isolation with migration
                   theta1,     # theta1 (pop1)
-                  thetaF,     # theta1 (pop1)
+#                  thetaF,     # theta1 (pop1)
                   theta2,     # theta2 (pop2)
                   thetaA,     # thetaA (ancestral)
-                  T1,         # change pop size in pop1
+                  alpha1,     # growth rate in pop1
+#                  T1,         # change pop size in pop1
                   T2,         # change pop size in pop2
                   M,          # migration
                   TS,         # time split of pop1 from pop2

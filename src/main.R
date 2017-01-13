@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 # Script to perform an ABC analysis
-# Miguel Navascués 2016
+# Miguel Navascués 2017
 # Miguel.Navascues@supagro.inra.fr
 
 ### Remove last features
@@ -13,36 +13,37 @@ ls()
 # ABC GENERAL SETTINGS
 #########################################
 
-nsim             <- 1000000             # number of simulations
-input_filename   <- "agrarius.str"      # data file
-reftable_file    <- "reference_table"   # reference table file name
+nsim             <- 20000               # number of simulations
+input_filename   <- "data/agrarius.str" # data file
+reftable_file    <- "results/reference_table"   # reference table file name
 tolerance        <- 0.01                # tolerance level (proportion of kept simulations)
 seed             <- 1234 ; 
 set.seed(seed,"Mersenne-Twister")
 check_data       <- T
 simulations_only <- F
 parallel_sims    <- T
-num_of_threads   <- 8
+num_of_threads   <- 12
 
 # Model graphical description
 #
 #     pop1            pop2
 #
 #    theta1          theta2
-#  |       |    M     | | 
-#  |__   __|  <--->   | | 
-#     | |            _| |_
-#     | |           |     |
-#  TS |_|___________|     |
+#  \         /  M   |   | 
+#   \       / <---> |   | 
+#    \     /        |   |_  T2 (either expansion or contraction) 
+#     \   /         |     |
+#  TS  \_/__________|     |
 #                   |     |
 #                   |     |
 #                   |     |
 #                   |     |
 #                   thetaA
 #
-# NB: a population expansion is assumed in pop 1,
+# NB: a population expansion is assumed in pop 1 (with growth rate alpha1),
 # but no assumption on thhe type of demographic change
 # is made for pop 2 (see file fun.R to check ms command)
+# order of events (TS and T2) is not fixed a priori
 
 #########################################
 # DEFINE PRIORS (upper and lower limit)
@@ -56,6 +57,9 @@ M_max <- 2
 
 T_min <- 0
 T_max <- 10
+
+alpha_min <- 0
+alpha_max <- 5
 
 PGSM_min <- 0     # Generalised Stepwise Mutation model parameter 
 PGSM_max <- 1     # (probability of mutations larger than a single repeat unit)
@@ -82,10 +86,10 @@ if(parallel_sims){
 # Uses RR Hudson coalescent simulator (ms)
 # load RR Hudson's R script distributed with ms to read ms output in R
 # http://home.uchicago.edu/~rhudson1/source/mksamples.html
-source("readms.output.R")
+source("bin/readms.output.R")
 
 # load other functions (from file distributed together with present file)
-source("fun.R")
+source("src/fun.R")
 
 #########################################
 # LOAD DATA
@@ -126,7 +130,6 @@ pop2  <- which(microsat_data$population==2)
 sample_size_pop1  <- length(pop1)
 sample_size_pop2  <- length(pop2)
 sample_size_total <- sample_size_pop1 + sample_size_pop2
-num_of_loci       <- ncol(microsat_data)-2
 
 
 cat("\n Data loaded and checked\n\n")
@@ -141,12 +144,12 @@ cat("\n Data loaded and checked\n\n")
   
   # write header of file
   write.table( t(statistics_head),
-               file="target_sumstats.txt",sep=" ",
+               file="results/target_sumstats.txt",sep=" ",
                quote=F,col.names=F,row.names=F,append=F)
   
   # write summary statistics to file
   write.table( target_sumstats,
-               file      = "target_sumstats.txt",
+               file      = "results/target_sumstats.txt",
                sep       = " ",
                quote     = FALSE,
                col.names = FALSE,
@@ -165,10 +168,11 @@ cat("\n Target summary statistics computed\n\n")
 # write header of reference table 
 paramaters_head <- c("model",      # 0:isolation; 1:isolation with migration
                      "theta1",     # theta1        (pop1)
-                     "thetaF",     # theta founder (pop1)
+                     #"thetaF",     # theta founder (pop1)
                      "theta2",     # theta1 * x2   (pop2)
                      "thetaA",     # theta1 * xA   (ancestral=pop2)
-                     "T1",         # time demographic change (pop1)
+                     "alpha1",     # growth rate in pop1
+                     #"T1",         # time demographic change (pop1)
                      "T2",         # time demographic change (pop1)
                      "M",          # migration
                      "TS",         # time split
@@ -188,6 +192,7 @@ if(parallel_sims){
   clusterEvalQ(cl,library(mmod))
   ref_table <- foreach(sim=seq_len(nsim),.combine=rbind) %dopar% do_sim(sim,nsim,theta_min,theta_max,
                                                                         M_min,M_max,T_min,T_max,
+                                                                        alpha_min,alpha_max,
                                                                         PGSM_min,PGSM_max,sample_size_total,
                                                                         sample_size_pop1,sample_size_pop2,
                                                                         num_of_loci, missing_data)
@@ -244,15 +249,15 @@ if(!simulations_only){
   
 
   # read target summary statistics
-  target_sumstats <- read.table("target_sumstats.txt",header=T)
+  target_sumstats <- read.table("results/target_sumstats.txt",header=T)
   
   # modify model column in reference table to reflect more intuitevely the two models
-  ref_table[which(ref_table[,1]==0),1] <- "I"    # Isolation (pure divergence)
-  ref_table[which(ref_table[,1]==1),1] <- "IM"   # Isolation with Migration (divergence with migration)
+  ref_table[,1] <- ref_table[,1]+1 # 1 = I  - Isolation (pure divergence)
+                                   # 2 = IM - Isolation with Migration (divergence with migration)
   
   # define set of summary statistics to be used (currently: all are used)
-  sumstats_names <- scan(file="target_sumstats.txt",what=character(),nlines=1)
-  (sumstats_names==statistics_head)
+  sumstats_names <- scan(file="results/target_sumstats.txt",what=character(),nlines=1)
+  #(sumstats_names==statistics_head)
   #sumstats_names <- sumstats_names[-(31:36)]
   
   # estimate posterior probabilities of both models (rejection and logistic regression methods)
@@ -264,52 +269,41 @@ if(!simulations_only){
   #summary(model_selection_result)
   
   #  estimate posterior probabilities of both models (random forest)
-  for( no_sims in c(5000,10000,15000,20000,25000,30000) ){
-    model_RF <- abcrf(modindex = as.factor(ref_table$model)[seq_len(no_sims)],
-                      sumsta   = ref_table[seq_len(no_sims),sumstats_names],
-                      paral=T, ncores=16)
-    assign(paste("model_RF",no_sims,sep="_"),model_RF )
-    remove(model_RF)
-  }
-  model_RF_5000$prior.err
-  model_RF_10000$prior.err
-  model_RF_15000$prior.err
-  model_RF_20000$prior.err
-  model_RF_25000$prior.err
-  model_RF_30000$prior.err
+  modindex <- as.factor(ref_table$model)
+  sumsta   <- ref_table[,sumstats_names]
+  model_RF <- abcrf(modindex~.,
+                    data=data.frame(modindex, sumsta),
+                    ntree=1000,
+                    paral=T,
+                    ncores=num_of_threads)
+  model_RF$prior.err
+  plot(model_RF,
+       training=data.frame(modindex, sumsta),
+       obs=target_sumstats)
+  err.abcrf(model_RF,
+            training=data.frame(modindex, sumsta),
+            paral=T,
+            ncores=num_of_threads)
+  model_selection_result_RF <- predict(object         = model_RF,
+                                       obs            = target_sumstats,
+                                       training       = data.frame(modindex, sumsta),
+                                       ntree          = 1000,
+                                       paral          = T,
+                                       ncores         = num_of_threads,
+                                       paral.predict  = T,
+                                       ncores.predict = num_of_threads)
   
-  err.abcrf(model_RF_10000)
-  err.abcrf(model_RF_25000)
-  err.abcrf(model_RF_30000)
+# error in predict, run manually to get the following result:
+#   selected model votes model1 votes model2 post.proba
+# 1              2        0.143        0.857  0.8572667
   
-  plot(model_RF_10000)
-  plot(model_RF_25000)
-  plot(model_RF_30000)
   
-  model_selection_result_RF <- predict(object   = model_RF_10000,
-                                       obs      = target_sumstats[,sumstats_names],
-                                       sampsize = 10000,
-                                       ntree    = 500,
-                                       paral    = TRUE)
-  model_selection_result_RF <- predict(object   = model_RF_25000,
-                                       obs      = target_sumstats[,sumstats_names],
-                                       sampsize = 25000,
-                                       ntree    = 500,
-                                       paral    = TRUE)
-  model_selection_result_RF <- predict(object   = model_RF_30000,
-                                       obs      = target_sumstats[,sumstats_names],
-                                       sampsize = 25000,
-                                       ntree    = 500,
-                                       paral    = TRUE)
-  (model_selection_result_RF)
-  summary(model_selection_result_RF)
+  #(model_selection_result_RF)
+  #summary(model_selection_result_RF)
   
-  model_RF_25000$model.lda
-  model_RF_10000$model.lda
-  
-  save(model_RF_5000,  model_RF_10000, model_RF_15000,
-       model_RF_20000, model_RF_25000, model_RF_30000,
-       model_selection_result_RF, file="model_choice.RData")
+  save(model_RF,
+       #model_selection_result_RF,
+       file="model_choice.RData")
   
   load(file="model_choice.RData")
   # separate referece table into two reference tables (for the two models)
