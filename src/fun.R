@@ -319,10 +319,10 @@ do_sim <- function(sim,nsim,
                   theta1,     # theta1 (pop1)
 #                  thetaF,     # theta1 (pop1)
                   theta2,     # theta2 (pop2)
-                  thetaA,     # thetaA (ancestral)
-                  alpha1,     # growth rate in pop1
+#                  thetaA,     # thetaA (ancestral)
+#                  alpha1,     # growth rate in pop1
 #                  T1,         # change pop size in pop1
-                  T2,         # change pop size in pop2
+#                  T2,         # change pop size in pop2
                   M,          # migration
                   TS,         # time split of pop1 from pop2
                   PGSM,
