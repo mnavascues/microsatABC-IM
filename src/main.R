@@ -583,7 +583,77 @@ if(!simulations_only){
        cov_M_TS,
        file="results/parameter_estimate.RData")
   #load(file="results/parameter_estimate.RData")
+
+  # Plot Posterior probability distribution (black) compared to prior probability distribution (grey)
   
+  png(filename="results/Prior_vs_Posterior.png", width=8.3, height=11.7, units = "in", res=700)
+  #pdf(file="results/Prior_vs_Posterior.pdf", width=8.3, height=11.7)
+  par(cex.axis = 1.5,
+      cex.lab  = 2,
+      cex.main = 2,
+      mar      = c(2,2,3,2),
+      oma      = c(2,5,0,0),
+      mfrow    = c(3,2))
+  
+  densityPlot(object    = RFmodel_theta1,
+              obs       = as.data.frame(target_sumstats),
+              training  = data.frame(log10theta1, sumsta),
+              main      = expression(log[10]*italic(theta)["W"]),
+              paral     = T, 
+              ncores    = num_of_threads)
+  lines(density(log10theta1), col="grey")
+  
+  densityPlot(object    = RFmodel_theta2,
+              obs       = as.data.frame(target_sumstats),
+              training  = data.frame(log10theta2, sumsta),
+              main      = expression(log[10]*italic(theta)["E"]),
+              paral     = T, 
+              ncores    = num_of_threads)
+  lines(density(log10theta2), col="grey")
+  
+  densityPlot(object    = RFmodel_TS,
+              obs       = as.data.frame(target_sumstats),
+              training  = data.frame(log10TS, sumsta),
+              main      = expression(log[10]*italic("T")["F"]),
+              paral     = TRUE, 
+              ncores    = num_of_threads)
+  lines(density(log10TS), col="grey")
+  
+  densityPlot(object    = RFmodel_M,
+              obs       = as.data.frame(target_sumstats),
+              training  = data.frame(log10M, sumstaIM),
+              main      = expression(log[10]*italic("M")),
+              paral     = TRUE, 
+              ncores    = num_of_threads)
+  lines(density(log10M), col="grey")
+  
+  densityPlot(object    = RFmodel_PGSM,
+              obs       = as.data.frame(target_sumstats),
+              training  = data.frame(PGSM, sumsta),
+              main      = expression(italic("P")["GSM"]),
+              paral     = TRUE, 
+              ncores    = num_of_threads)
+  lines(density(PGSM), col="grey")
+  
+  plot.new()
+  legend(x      = "topleft",
+         legend = c("Prior probability distribution", "Posterior probability distribution"),
+         lty    = 1,
+         cex    = 1.5,
+         col    = c("grey","black"))
+  mtext(text  = "Probability density",
+        side  = 2,
+        line  = 1,
+        adj   = 0.5,
+        cex   = 1.5,
+        outer = TRUE)
+  
+  dev.off ( which=dev.cur() )
+  
+  
+  
+  
+    
 }  
 
 
