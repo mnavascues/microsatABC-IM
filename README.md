@@ -1,4 +1,4 @@
-# microsatABC-IM
+# A script in R to perform an Random Forest Approximate Bayesian Computation analysis under the Isolation with Migration model from microsatellite data
 Script in R to perform an Approximate Bayesian Computation (ABC) analysis under the Isolation with Migration model from microsatellite data.
 
 Demographic history was inferred from microsatellite data using an approximate Bayesian computation (ABC) approach via random forests (Marin et al. 2016; Pudlo et al. 2016). In this approach, data is simulated from the demographic model with parameter values taken from prior probability distributions and data is transformed into summary statistics. Random forests are used to learn about the parameters from the simulated summary statistics. The resulting random forests can then be used to estimate the posterior probability distributions of parameters.
