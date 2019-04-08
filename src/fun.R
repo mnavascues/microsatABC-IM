@@ -44,8 +44,10 @@ Navascues_beta <- function(Na,V,log_beta=F){
 
 calculate_summary_statistics <- function(data,pop1,pop2){
   
+  tot_num_ind<-length(data[,1]) # Thanks you Sean!
+  
   # Change to other formats
-  data_as_loci <- data.frame(apply(data, 2, function(x) paste(x[seq(1,680,2)],x[seq(2,680,2)],sep="/")))
+  data_as_loci <- data.frame(apply(data, 2, function(x) paste(x[seq(1,tot_num_ind,2)],x[seq(2,tot_num_ind,2)],sep="/")))
   data_as_loci[data_as_loci=="NA/NA"]<-NA
   data_as_genind <- df2genind(data_as_loci,sep="/",pop=c(rep(1,length(pop1)/2),rep(2,length(pop2)/2)))
   clusters<-c(rep(1,length(pop1)/2),rep(2,length(pop2)/2))
@@ -242,9 +244,9 @@ do_sim <- function(sim,nsim,
   #thetaF <- min(theta_pop1)
   theta1 <- 10^runif( 1, min=theta_min, max=theta_max )
   theta2 <- 10^runif( 1, min=theta_min, max=theta_max )
-  #thetaA <- 10^runif( 1, min=theta_min, max=theta_max )
+  thetaA <- 10^runif( 1, min=theta_min, max=theta_max )
   x2     <- theta2/theta1
-  #xA     <- thetaA/theta1
+  xA     <- thetaA/theta1
   #xF     <- thetaF/theta1
   #alpha1  <- runif( 1, min=alpha_min, max=alpha_max)
   #alpha2 <- runif( 1, min=alpha_min, max=alpha_max)
@@ -272,7 +274,7 @@ do_sim <- function(sim,nsim,
                    "-n 2", x2,                                    # population size in pop2
                    #"-g 1", alpha1,
                    #"-en", T1, "1", xF,                           # change pop size in pop1
-                   #"-en", T2, "2", xA,                            # change pop size in pop2
+                   "-en", TS, "2", xA,                            # change pop size in pop2
                    "-ej", TS, "1 2",                              # creation of pop1 from pop2
                    ">", ms_out_file)                              # output file
   
@@ -319,7 +321,7 @@ do_sim <- function(sim,nsim,
                   theta1,     # theta1 (pop1)
 #                  thetaF,     # theta1 (pop1)
                   theta2,     # theta2 (pop2)
-#                  thetaA,     # thetaA (ancestral)
+                  thetaA,     # thetaA (ancestral)
 #                  alpha1,     # growth rate in pop1
 #                  T1,         # change pop size in pop1
 #                  T2,         # change pop size in pop2

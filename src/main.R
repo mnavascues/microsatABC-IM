@@ -13,13 +13,15 @@ ls()
 # ABC GENERAL SETTINGS
 #########################################
 
-nsim             <- 40000               # number of simulations 40000
+nsim             <- 200000               # number of simulations
+batch_size       <- 100
+nsim <- round(nsim/batch_size)*batch_size
 input_filename   <- "data/agrarius.str" # data file
 reftable_file    <- "results/reference_table"   # reference table file name
 seed             <- 1234 ; 
 set.seed(seed,"Mersenne-Twister")
 check_data       <- T
-simulations_only <- T
+simulations_only <- F
 parallel_sims    <- T
 num_of_threads   <- 10
 
@@ -32,15 +34,15 @@ num_of_threads   <- 10
 #     |   |  <--->  |     | 
 #     |   |         |     | 
 #     |   |         |     |
-#  TS |___|_________|     |
-#                   |     |
-#                   |     |
-#                   |     |
-#                   |     |
+#  TS |___|_________|_____|
+#            |  |
+#            |  |
+#            |  |
+#            |  |
 # 
 #
 # NB: a population expansion is assumed in pop 1 (with growth rate alpha1),
-# but no assumption on thhe type of demographic change
+# but no assumption on the type of demographic change
 # is made for pop 2 (see file fun.R to check ms command)
 # order of events (TS and T2) is not fixed a priori
 
@@ -49,13 +51,13 @@ num_of_threads   <- 10
 #########################################
 
 theta_min <- -1
-theta_max <-  3
+theta_max <-  2
 
 M_min <- -5
-M_max <- 2
+M_max <- 3
 
 T_min <- -5
-T_max <- 1
+T_max <- 4
 
 alpha_min <- 0
 alpha_max <- 5
@@ -169,10 +171,10 @@ paramaters_head <- c("model",      # 0:isolation; 1:isolation with migration
                      "theta1",     # theta1        (pop1)
                      #"thetaF",     # theta founder (pop1)
                      "theta2",     # theta1 * x2   (pop2)
-                     #"thetaA",     # theta1 * xA   (ancestral=pop2)
+                     "thetaA",     # theta1 * xA   (ancestral!=pop2)
                      #"alpha1",     # growth rate in pop1
                      #"T1",         # time demographic change (pop1)
-                     #"T2",         # time demographic change (pop1)
+                     #"T2",         # time demographic change (pop2)
                      "M",          # migration
                      "TS",         # time split
                      "PGSM")       # parameter for the generalised stepwise mutation model   
@@ -189,12 +191,25 @@ if(parallel_sims){
   registerDoParallel(cl)
   clusterEvalQ(cl,library(pegas))
   clusterEvalQ(cl,library(mmod))
-  ref_table <- foreach(sim=seq_len(nsim),.combine=rbind) %dopar% do_sim(sim,nsim,theta_min,theta_max,
-                                                                        M_min,M_max,T_min,T_max,
-                                                                        alpha_min,alpha_max,
-                                                                        PGSM_min,PGSM_max,sample_size_total,
-                                                                        sample_size_pop1,sample_size_pop2,
-                                                                        num_of_loci, missing_data)
+  for (batch in 1:(nsim/batch_size) ){
+    print(paste(batch,"of",(nsim/batch_size)))
+    ref_table <- foreach(sim=seq_len(batch_size),.combine=rbind) %dopar% do_sim(sim,batch_size,theta_min,theta_max,
+                                                                                M_min,M_max,T_min,T_max,
+                                                                                alpha_min,alpha_max,
+                                                                                PGSM_min,PGSM_max,sample_size_total,
+                                                                                sample_size_pop1,sample_size_pop2,
+                                                                                num_of_loci, missing_data)
+    write.table( ref_table,
+                 file      = paste0(reftable_file,".txt"),
+                 sep       = " ",
+                 quote     = F,
+                 col.names = F,
+                 row.names = F,
+                 append    = T)
+    remove(ref_table)
+    gc()
+    
+  }
   stopCluster(cl)
   
 }else{
@@ -207,15 +222,18 @@ if(parallel_sims){
                               num_of_loci, missing_data)
     
   }
+  write.table( ref_table,
+               file      = paste0(reftable_file,".txt"),
+               sep       = " ",
+               quote     = F,
+               col.names = F,
+               row.names = F,
+               append    = T)
+  
+  
+
 }
 gc()
-write.table( ref_table,
-             file      = paste0(reftable_file,".txt"),
-             sep       = " ",
-             quote     = F,
-             col.names = F,
-             row.names = F,
-             append    = T)
 
 ref_table <- read.table(paste0(reftable_file,".txt"),header=T)
 #dim(ref_table)
@@ -281,12 +299,13 @@ if(!simulations_only){
        training=data.frame(modindex, sumsta),
        obs=target_sumstats)
   
+  
   err.abcrf(model_RF,
             training=data.frame(modindex, sumsta),
             paral=T,
             ncores=num_of_threads)
   model_selection_result_RF <- predict(object         = model_RF,
-                                       obs            = target_sumstats,
+                                       obs            = rbind(target_sumstats,target_sumstats),
                                        training       = data.frame(modindex, sumsta),
                                        ntree          = 1000,
                                        paral          = T,
@@ -299,6 +318,8 @@ if(!simulations_only){
   save(model_RF,
        model_selection_result_RF,
        file="results/model_choice.RData")
+  remove(model_RF,
+         model_selection_result_RF)
   
   #load(file="results/model_choice.RData")
   # separate referece table into two reference tables (for the two models)
@@ -332,21 +353,26 @@ if(!simulations_only){
                paral    = T,
                ncores   = num_of_threads)
   posterior_theta1 <- predict(object    = RFmodel_theta1,
-                              obs       = target_sumstats,
+                              obs       = rbind(target_sumstats,target_sumstats),
                               training  = data.frame(log10theta1, sumsta),
                               quantiles = c(0.025,0.5,0.975),
                               paral     = T,
                               ncores    = num_of_threads)
   (posterior_theta1)
   densityPlot(object    = RFmodel_theta1,
-              obs       = target_sumstats,
+              obs       = rbind(target_sumstats,target_sumstats),
               training  = data.frame(log10theta1, sumsta),
               main      = expression(log[10]*theta["W"]),
               paral     = T, 
               ncores    = num_of_threads)
   lines(density(log10theta1), col="grey")
   
-
+  save(RFmodel_theta1,
+       posterior_theta1,
+       file="results/posterior_theta1.RData")
+  remove(RFmodel_theta1,
+         posterior_theta1)
+  gc()
   
   
   
@@ -369,23 +395,74 @@ if(!simulations_only){
                paral    = T,
                ncores   = num_of_threads)
   posterior_theta2 <- predict(object    = RFmodel_theta2,
-                              obs       = target_sumstats,
+                              obs       = rbind(target_sumstats,target_sumstats),
                               training  = data.frame(log10theta2, sumsta),
                               quantiles = c(0.025,0.5,0.975),
                               paral     = T,
                               ncores    = num_of_threads)
   (posterior_theta2)
   densityPlot(object    = RFmodel_theta2,
-              obs       = target_sumstats,
+              obs       = rbind(target_sumstats,target_sumstats),
               training  = data.frame(log10theta2, sumsta),
               main      = expression(log[10]*theta["E"]),
               paral     = T, 
               ncores    = num_of_threads)
   lines(density(log10theta2), col="grey")
   
+ 
+  save(RFmodel_theta2,
+       posterior_theta2,
+       file="results/posterior_theta2.RData")
+  remove(RFmodel_theta2,
+         posterior_theta2)
+  gc()
   
   
   
+  
+  
+  
+   
+  
+  
+  # thetaA
+  #------------
+  
+  log10thetaA <- log10(ref_table[,"thetaA"])
+  RFmodel_thetaA <- regAbcrf(formula = log10thetaA~.,
+                             data    = data.frame(log10thetaA, sumsta),
+                             ntree   = 1000,
+                             paral   = T,
+                             ncores  = num_of_threads)
+  plot(x     = RFmodel_thetaA,
+       n.var = ncol(sumsta))
+  err.regAbcrf(object   = RFmodel_thetaA,
+               training = data.frame(log10thetaA, sumsta),
+               paral    = T,
+               ncores   = num_of_threads)
+  posterior_thetaA <- predict(object    = RFmodel_thetaA,
+                              obs       = rbind(target_sumstats,target_sumstats),
+                              training  = data.frame(log10thetaA, sumsta),
+                              quantiles = c(0.025,0.5,0.975),
+                              paral     = T,
+                              ncores    = num_of_threads)
+  (posterior_thetaA)
+  densityPlot(object    = RFmodel_thetaA,
+              obs       = rbind(target_sumstats,target_sumstats),
+              training  = data.frame(log10thetaA, sumsta),
+              main      = expression(log[10]*theta["A"]),
+              paral     = T, 
+              ncores    = num_of_threads)
+  lines(density(log10thetaA), col="grey")
+  
+  
+  
+  save(RFmodel_thetaA,
+       posterior_thetaA,
+       file="results/posterior_thetaA.RData")
+  remove(RFmodel_thetaA,
+         posterior_thetaA)
+  gc()
   
   
   
@@ -419,14 +496,14 @@ if(!simulations_only){
                paral    = T,
                ncores   = num_of_threads)
   posterior_TS <- predict(object    = RFmodel_TS,
-                          obs       = target_sumstats,
+                          obs       = rbind(target_sumstats,target_sumstats),
                           training  = data.frame(log10TS, sumsta),
                           quantiles = c(0.025,0.5,0.975),
                           paral     = TRUE,
                           ncores    = num_of_threads)
   (posterior_TS)
   densityPlot(object    = RFmodel_TS,
-              obs       = target_sumstats,
+              obs       = rbind(target_sumstats,target_sumstats),
               training  = data.frame(log10TS, sumsta),
               main      = expression(log[10]*"T"["F"]),
               paral     = TRUE, 
@@ -446,14 +523,14 @@ if(!simulations_only){
                paral    = T,
                ncores   = num_of_threads)
   posterior_TS_IM <- predict(object    = RFmodel_TS_IM,
-                          obs       = target_sumstats,
+                          obs       = rbind(target_sumstats,target_sumstats),
                           training  = data.frame(log10TS, sumstaIM),
                           quantiles = c(0.025,0.5,0.975),
                           paral     = TRUE,
                           ncores    = num_of_threads)
   (posterior_TS_IM)
   densityPlot(object    = RFmodel_TS_IM,
-              obs       = target_sumstats,
+              obs       = rbind(target_sumstats,target_sumstats),
               training  = data.frame(log10TS, sumstaIM),
               main      = expression(log[10]*"T"["F"]),
               paral     = TRUE, 
@@ -484,19 +561,20 @@ if(!simulations_only){
                         ncores  = num_of_threads)
   plot(x     = RFmodel_M,
        n.var = ncol(sumstaIM))
+  
   err.regAbcrf(object   = RFmodel_M,
                training = data.frame(log10M, sumstaIM),
                paral    = T,
                ncores   = num_of_threads)
   posterior_M <- predict(object    = RFmodel_M,
-                         obs       = target_sumstats,
+                         obs       = rbind(target_sumstats,target_sumstats),
                          training  = data.frame(log10M, sumstaIM),
                          quantiles = c(0.025,0.5,0.975),
                          paral     = TRUE,
                          ncores    = num_of_threads)
   (posterior_M)
   densityPlot(object    = RFmodel_M,
-              obs       = target_sumstats,
+              obs       = rbind(target_sumstats,target_sumstats),
               training  = data.frame(log10M, sumstaIM),
               main      = expression(log[10]*"M"),
               paral     = TRUE, 
@@ -524,14 +602,14 @@ if(!simulations_only){
                paral    = T,
                ncores   = num_of_threads)
   posterior_PGSM <- predict(object    = RFmodel_PGSM,
-                            obs       = target_sumstats,
+                            obs       = rbind(target_sumstats,target_sumstats),
                             training  = data.frame(PGSM, sumsta),
                             quantiles = c(0.025,0.5,0.975),
                             paral     = TRUE,
                             ncores    = num_of_threads)
   (posterior_PGSM)
   densityPlot(object    = RFmodel_PGSM,
-              obs       = target_sumstats,
+              obs       = rbind(target_sumstats,target_sumstats),
               training  = data.frame(PGSM, sumsta),
               main      = expression("P"["GSM"]),
               paral     = TRUE, 
@@ -543,7 +621,7 @@ if(!simulations_only){
   log10TS <- log10(ref_tableIM[,"TS"])
   cov_M_TS <- covRegAbcrf(regForest1     = RFmodel_M,
                           regForest2     = RFmodel_TS_IM,
-                          obs            = target_sumstats,
+                          obs            = rbind(target_sumstats,target_sumstats),
                           training1      = data.frame(log10M, sumstaIM),
                           training2      = data.frame(log10TS, sumstaIM),
                           ntree          = 1000,
@@ -572,6 +650,8 @@ if(!simulations_only){
        posterior_theta1,
        RFmodel_theta2,
        posterior_theta2,
+       RFmodel_thetaA,
+       posterior_thetaA,
        RFmodel_TS,
        posterior_TS,
        RFmodel_TS_IM,
@@ -611,7 +691,15 @@ if(!simulations_only){
               ncores    = num_of_threads)
   lines(density(log10theta2), col="grey")
   
-  densityPlot(object    = RFmodel_TS,
+  densityPlot(object    = RFmodel_thetaA,
+              obs       = as.data.frame(target_sumstats),
+              training  = data.frame(log10thetaA, sumsta),
+              main      = expression(log[10]*italic(theta)["A"]),
+              paral     = T, 
+              ncores    = num_of_threads)
+  lines(density(log10thetaA), col="grey")
+
+    densityPlot(object    = RFmodel_TS,
               obs       = as.data.frame(target_sumstats),
               training  = data.frame(log10TS, sumsta),
               main      = expression(log[10]*italic("T")["F"]),
